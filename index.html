@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checklist FUT</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Checklist FUT</h1>
+    <div class="progress" id="progress">Progression : 0%</div>
+    <div class="filters">
+        <input type="text" id="searchName" placeholder="Rechercher par nom...">
+        <input type="text" id="searchClub" placeholder="Rechercher par club...">
+        <input type="text" id="searchLeague" placeholder="Rechercher par championnat...">
+        <input type="number" id="searchOVR" placeholder="Note (OVR)..." min="0" max="99">
+    </div>
+    <div id="players"></div>
+    <script src="script.js"></script>
+</body>
+</html>
