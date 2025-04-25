@@ -1,33 +1,34 @@
+import { doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
 let allPlayers = [];
 let filteredPlayers = [];
-let packed = loadState();
+let packed = {};
 let currentPage = 0;
 const playersPerPage = 50;
-const totalPlayers = 17737; // Nombre total de joueurs
+const totalPlayers = 17737;
 
-async function loadPlayers() {
+// Définir loadPlayers et l'attacher à window
+export async function loadPlayers(user, db) {
     try {
         const response = await fetch('fut_players_updated.json');
+        if (!response.ok) throw new Error('Échec du chargement de fut_players_updated.json');
         allPlayers = await response.json();
         console.log('Joueurs chargés:', allPlayers.length);
-        filteredPlayers = allPlayers; // Initialement, tous les joueurs sont affichés
-        renderPlayers();
+        filteredPlayers = allPlayers;
+        const docRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(docRef);
+        packed = docSnap.exists() ? docSnap.data().packed || {} : {};
+        renderPlayers(user, db);
     } catch (error) {
-        console.error('Erreur lors du chargement des joueurs:', error);
-        const container = document.getElementById('players');
-        if (container) {
-            container.innerHTML = 'Erreur lors du chargement des joueurs.';
-        }
+        console.error('Erreur:', error);
+        document.getElementById('players').innerHTML = 'Erreur lors du chargement des joueurs.';
     }
 }
+window.loadPlayers = loadPlayers; // Attacher à window
 
-function saveState() {
-    localStorage.setItem("packedPlayers", JSON.stringify(packed));
-}
-
-function loadState() {
-    const data = localStorage.getItem("packedPlayers");
-    return data ? JSON.parse(data) : {};
+function saveState(user, db) {
+    const docRef = doc(db, 'users', user.uid);
+    setDoc(docRef, { packed }, { merge: true });
 }
 
 function updateProgress() {
@@ -36,7 +37,7 @@ function updateProgress() {
     document.getElementById("progress").textContent = `Progression : ${percent}% (${checked}/${totalPlayers})`;
 }
 
-function applyFilters() {
+function applyFilters(user, db) {
     const searchName = document.getElementById("searchName").value.toLowerCase();
     const searchClub = document.getElementById("searchClub").value.toLowerCase();
     const searchLeague = document.getElementById("searchLeague").value.toLowerCase();
@@ -50,11 +51,11 @@ function applyFilters() {
         return matchesName && matchesClub && matchesLeague && matchesOVR;
     });
 
-    currentPage = 0; // Réinitialiser à la première page
-    renderPlayers();
+    currentPage = 0;
+    renderPlayers(user, db);
 }
 
-function renderPlayers() {
+function renderPlayers(user, db) {
     const container = document.getElementById("players");
     container.innerHTML = '';
 
@@ -65,9 +66,10 @@ function renderPlayers() {
     pagePlayers.forEach((p) => {
         const div = document.createElement("div");
         div.className = "player";
-        if (packed[p.Name]) {
-            div.classList.add("checked"); // Appliquer la classe checked si coché
-        }
+        if (packed[p.Name]) div.classList.add("checked");
+        if (p.OVR >= 80) div.classList.add("gold");
+        else if (p.OVR >= 65) div.classList.add("silver");
+        else div.classList.add("bronze");
 
         const label = document.createElement("label");
         label.textContent = `${p.Name} (OVR ${p.OVR}) - ${p.Team} / ${p.League}`;
@@ -77,12 +79,9 @@ function renderPlayers() {
         checkbox.checked = packed[p.Name] || false;
         checkbox.addEventListener("change", () => {
             packed[p.Name] = checkbox.checked;
-            if (checkbox.checked) {
-                div.classList.add("checked");
-            } else {
-                div.classList.remove("checked");
-            }
-            saveState();
+            if (checkbox.checked) div.classList.add("checked");
+            else div.classList.remove("checked");
+            saveState(user, db);
             updateProgress();
         });
 
@@ -91,29 +90,30 @@ function renderPlayers() {
         container.appendChild(div);
     });
 
-    // Ajouter la navigation
     const nav = document.createElement("div");
     nav.className = "nav";
     nav.innerHTML = `
-        <button onclick="changePage(-1)" ${currentPage === 0 ? 'disabled' : ''}>Précédent</button>
+        <button onclick="window.changePage(-1)" ${currentPage === 0 ? 'disabled' : ''}>Précédent</button>
         <span>Page ${currentPage + 1} / ${Math.ceil(filteredPlayers.length / playersPerPage)}</span>
-        <button onclick="changePage(1)" ${end >= filteredPlayers.length ? 'disabled' : ''}>Suivant</button>
+        <button onclick="window.changePage(1)" ${end >= filteredPlayers.length ? 'disabled' : ''}>Suivant</button>
     `;
     container.appendChild(nav);
 
     updateProgress();
 }
 
-function changePage(delta) {
+window.changePage = (delta) => {
     currentPage += delta;
-    renderPlayers();
-}
+    renderPlayers(window.currentUser, window.firestoreDb); // Utiliser des variables globales
+};
 
-// Initialiser les événements de recherche
-document.getElementById("searchName").addEventListener("input", applyFilters);
-document.getElementById("searchClub").addEventListener("input", applyFilters);
-document.getElementById("searchLeague").addEventListener("input", applyFilters);
-document.getElementById("searchOVR").addEventListener("input", applyFilters);
-
-// Charger les joueurs
-loadPlayers();
+// Stocker user et db globalement pour éviter firebase global
+document.addEventListener("DOMContentLoaded", () => {
+    window.currentUser = null;
+    window.firestoreDb = null;
+    // Ces valeurs seront définies dans index.html
+    document.getElementById("searchName").addEventListener("input", () => applyFilters(window.currentUser, window.firestoreDb));
+    document.getElementById("searchClub").addEventListener("input", () => applyFilters(window.currentUser, window.firestoreDb));
+    document.getElementById("searchLeague").addEventListener("input", () => applyFilters(window.currentUser, window.firestoreDb));
+    document.getElementById("searchOVR").addEventListener("input", () => applyFilters(window.currentUser, window.firestoreDb));
+});

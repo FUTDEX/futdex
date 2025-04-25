@@ -3,19 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
     <title>Checklist FUT</title>
     <link rel="stylesheet" href="styles.css">
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyChblMaFG1gcOcAl0FIoihCGPAE69SKV2s",
+            authDomain: "futdex-f8264.firebaseapp.com",
+            projectId: "futdex-f8264",
+            storageBucket: "futdex-f8264.firebasestorage.app",
+            messagingSenderId: "649491255206",
+            appId: "1:649491255206:web:1f0e400423c73ce7c84967",
+            measurementId: "G-7451N50RP2"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Stocker user et db globalement
+        window.currentUser = null;
+        window.firestoreDb = db;
+
+        window.signIn = async () => {
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                document.getElementById("auth-error").textContent = getErrorMessage(error.code);
+            }
+        };
+
+        window.signUp = async () => {
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+            try {
+                await createUserWithEmailAndPassword(auth, email, password);
+                alert("Inscription réussie !");
+            } catch (error) {
+                document.getElementById("auth-error").textContent = getErrorMessage(error.code);
+            }
+        };
+
+        window.signOut = async () => {
+            await signOut(auth);
+        };
+
+        function getErrorMessage(errorCode) {
+            switch (errorCode) {
+                case 'auth/email-already-in-use': return "Cet e-mail est déjà utilisé.";
+                case 'auth/invalid-email': return "L’adresse e-mail est invalide.";
+                case 'auth/weak-password': return "Le mot de passe est trop faible (minimum 6 caractères).";
+                case 'auth/user-not-found': case 'auth/wrong-password': return "E-mail ou mot de passe incorrect.";
+                default: return "Une erreur s’est produite.";
+            }
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                window.currentUser = user;
+                document.getElementById("auth-container").style.display = "none";
+                document.getElementById("content").style.display = "block";
+                document.getElementById("signout").style.display = "block";
+                window.loadPlayers(user, db);
+            } else {
+                window.currentUser = null;
+                document.getElementById("auth-container").style.display = "block";
+                document.getElementById("content").style.display = "none";
+                document.getElementById("signout").style.display = "none";
+                document.getElementById("players").innerHTML = "";
+            }
+        });
+    </script>
 </head>
 <body>
-    <h1>Checklist FUT</h1>
-    <div class="progress" id="progress">Progression : 0%</div>
-    <div class="filters">
-        <input type="text" id="searchName" placeholder="Rechercher par nom...">
-        <input type="text" id="searchClub" placeholder="Rechercher par club...">
-        <input type="text" id="searchLeague" placeholder="Rechercher par championnat...">
-        <input type="number" id="searchOVR" placeholder="Note (OVR)..." min="0" max="99">
+    <div id="auth-container">
+        <h1>Checklist FUT</h1>
+        <div id="auth-form">
+            <input type="email" id="email" placeholder="Adresse e-mail">
+            <input type="password" id="password" placeholder="Mot de passe">
+            <button onclick="signIn()">Se connecter</button>
+            <button onclick="signUp()">S’inscrire</button>
+            <p id="auth-error" style="color: red;"></p>
+        </div>
+        <button id="signout" style="display: none;" onclick="signOut()">Se déconnecter</button>
     </div>
-    <div id="players"></div>
-    <script src="script.js"></script>
+    <div id="content" style="display: none;">
+        <header>
+            <img src="banner.jpg" alt="Bannière Checklist FUT" class="banner">
+            <h1>Checklist FUT</h1>
+        </header>
+        <div class="progress" id="progress">Progression : 0%</div>
+        <div class="filters">
+            <input type="text" id="searchName" placeholder="Rechercher par nom...">
+            <input type="text" id="searchClub" placeholder="Rechercher par club...">
+            <input type="text" id="searchLeague" placeholder="Rechercher par championnat...">
+            <input type="number" id="searchOVR" placeholder="Note (OVR)..." min="0" max="99">
+        </div>
+        <div id="players"></div>
+    </div>
+    <script src="script.js" type="module"></script>
 </body>
 </html>
